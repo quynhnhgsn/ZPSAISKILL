@@ -201,6 +201,22 @@
   .skill-chip input { display: none; }
   .skill-chip .chip-icon { font-size: 14px; }
   .skill-chip .chip-label { font-size: 13px; }
+  .other-input-wrap {
+    display: none; margin-top: 8px;
+    grid-column: 1 / -1;
+  }
+  .other-input-wrap.show { display: block; }
+  .other-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    padding: 9px 14px;
+    color: var(--text); font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    outline: none;
+  }
+  .other-input::placeholder { color: var(--muted); }
 
   .btn-row { display: flex; gap: 10px; justify-content: flex-end; }
   .btn {
@@ -775,6 +791,11 @@ async function init() {
 function renderChips(containerId, selectedIds = []) {
   const grid = document.getElementById(containerId);
   grid.innerHTML = '';
+
+  // Extract any "other:xxx" values from selectedIds
+  const otherVal = selectedIds.filter(s => s.startsWith('other:')).map(s => s.replace('other:', '')).join(', ');
+  const hasOther = otherVal.length > 0;
+
   SKILL_OPTIONS.forEach(s => {
     const chip = document.createElement('label');
     chip.className = 'skill-chip' + (selectedIds.includes(s.id) ? ' checked' : '');
@@ -782,10 +803,39 @@ function renderChips(containerId, selectedIds = []) {
     chip.querySelector('input').addEventListener('change', e => chip.classList.toggle('checked', e.target.checked));
     grid.appendChild(chip);
   });
+
+  // Other chip
+  const otherChip = document.createElement('label');
+  otherChip.className = 'skill-chip' + (hasOther ? ' checked' : '');
+  otherChip.id = `other-chip-${containerId}`;
+  otherChip.innerHTML = `<input type="checkbox" value="other" id="other-cb-${containerId}" ${hasOther ? 'checked' : ''} /><span class="chip-icon">✏️</span><span class="chip-label">Other</span>`;
+  grid.appendChild(otherChip);
+
+  // Other text input
+  const otherWrap = document.createElement('div');
+  otherWrap.className = 'other-input-wrap' + (hasOther ? ' show' : '');
+  otherWrap.id = `other-wrap-${containerId}`;
+  otherWrap.innerHTML = `<input class="other-input" id="other-text-${containerId}" placeholder="Nhập tên skill khác (vd: Narrative Design, Level Design...)" value="${otherVal}" />`;
+  grid.appendChild(otherWrap);
+
+  otherChip.querySelector('input').addEventListener('change', e => {
+    otherChip.classList.toggle('checked', e.target.checked);
+    otherWrap.classList.toggle('show', e.target.checked);
+    if (e.target.checked) document.getElementById(`other-text-${containerId}`).focus();
+  });
 }
 
 function getCheckedSkills(containerId) {
-  return Array.from(document.querySelectorAll(`#${containerId} input[type=checkbox]:checked`)).map(c => c.value);
+  const skills = Array.from(document.querySelectorAll(`#${containerId} input[type=checkbox]:checked`))
+    .map(c => c.value).filter(v => v !== 'other');
+  const otherCb = document.getElementById(`other-cb-${containerId}`);
+  if (otherCb && otherCb.checked) {
+    const otherText = document.getElementById(`other-text-${containerId}`).value.trim();
+    if (otherText) {
+      otherText.split(',').map(s => s.trim()).filter(Boolean).forEach(s => skills.push(`other:${s}`));
+    }
+  }
+  return skills;
 }
 
 // ══════════════════════════════════════════
@@ -856,6 +906,7 @@ function populateTeamFilter() {
 }
 
 function skillLabel(id) {
+  if (id.startsWith('other:')) return `✏️ ${id.replace('other:', '')}`;
   const s = SKILL_OPTIONS.find(x => x.id === id);
   return s ? `${s.icon} ${s.label}` : id;
 }
